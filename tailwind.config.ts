@@ -24,6 +24,9 @@ export default {
 				ring: 'hsl(var(--ring))',
 				background: 'hsl(var(--background))',
 				foreground: 'hsl(var(--foreground))',
+				'card-secondary': 'hsl(var(--card-secondary))',
+				'card-border': 'hsl(var(--card-border))',
+				'primary-glow': 'hsl(var(--primary-glow))',
 				primary: {
 					DEFAULT: 'hsl(var(--primary))',
 					foreground: 'hsl(var(--primary-foreground))'

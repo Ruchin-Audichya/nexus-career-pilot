@@ -1,14 +1,28 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from 'react';
+import { Onboarding } from '@/components/Onboarding';
+import { Dashboard } from '@/components/Dashboard';
+
+interface StudentProfile {
+  name: string;
+  college: string;
+  branch: string;
+  year: string;
+  skills: string[];
+  interests: string[];
+}
 
 const Index = () => {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
-    </div>
-  );
+  const [profile, setProfile] = useState<StudentProfile | null>(null);
+
+  const handleOnboardingComplete = (studentProfile: StudentProfile) => {
+    setProfile(studentProfile);
+  };
+
+  if (!profile) {
+    return <Onboarding onComplete={handleOnboardingComplete} />;
+  }
+
+  return <Dashboard profile={profile} />;
 };
 
 export default Index;
