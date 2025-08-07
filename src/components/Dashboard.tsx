@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,9 @@ import {
   Github,
   Zap
 } from 'lucide-react';
+import { ChatWidget } from '@/components/ChatWidget';
+import { searchInternships, type JobResult } from '@/services/jobApi';
+import { analyzeSkillGaps, generateProjectRecommendations, type SkillGapAnalysis, type ProjectRecommendation } from '@/services/aiService';
 
 interface StudentProfile {
   name: string;
@@ -124,6 +127,79 @@ const mockProjects = [
 
 export function Dashboard({ profile }: DashboardProps) {
   const [activeTab, setActiveTab] = useState('internships');
+  const [internships, setInternships] = useState<JobResult[]>([]);
+  const [skillGaps, setSkillGaps] = useState<SkillGapAnalysis[]>([]);
+  const [projects, setProjects] = useState<ProjectRecommendation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load data when component mounts
+  useEffect(() => {
+    loadDashboardData();
+  }, [profile]);
+
+  const loadDashboardData = async () => {
+    setIsLoading(true);
+    try {
+      // TODO: Replace with real API calls when you have API keys
+      // For now, this will use mock data from the services
+      
+      // Load internships based on user profile
+      const jobResults = await searchInternships({
+        skills: profile.skills,
+        interests: profile.interests,
+        experience_level: 'internship'
+      });
+      setInternships(jobResults);
+
+      // Analyze skill gaps against popular job descriptions
+      const skillAnalysis = await analyzeSkillGaps(profile, [
+        'Software Engineer Intern - Requires Python, Java, Data Structures, Algorithms',
+        'Frontend Developer Intern - Requires React, JavaScript, HTML, CSS, Git',
+        'ML Engineer Intern - Requires Python, Machine Learning, TensorFlow, Statistics'
+      ]);
+      setSkillGaps(skillAnalysis);
+
+      // Generate personalized project recommendations
+      const projectRecs = await generateProjectRecommendations(profile);
+      setProjects(projectRecs);
+
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      // Fall back to mock data
+      setInternships(mockInternships.map(job => ({
+        id: job.id.toString(),
+        title: job.title,
+        company: job.company,
+        location: job.location,
+        type: 'internship' as const,
+        stipend: job.stipend,
+        description: job.description,
+        required_skills: job.skills,
+        apply_url: job.url,
+        posted_date: new Date().toISOString()
+      })));
+      setSkillGaps(mockSkillGaps.map(gap => ({
+        role: gap.role,
+        company: gap.company,
+        requiredSkills: gap.requiredSkills,
+        matchedSkills: gap.matchedSkills,
+        missingSkills: gap.missingSkills,
+        matchPercentage: gap.matchPercentage,
+        recommendations: ['Learn missing skills', 'Practice coding problems', 'Build relevant projects']
+      })));
+      setProjects(mockProjects.map(proj => ({
+        title: proj.title,
+        description: proj.description,
+        problemStatement: proj.problem,
+        techStack: proj.techStack,
+        difficulty: proj.difficulty as 'Beginner' | 'Intermediate' | 'Advanced',
+        estimatedTime: proj.estimatedTime,
+        learningOutcomes: ['Technical skills', 'Problem solving', 'Project management']
+      })));
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -218,66 +294,70 @@ export function Dashboard({ profile }: DashboardProps) {
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold">Internship Matches</h2>
               <Badge className="gradient-success text-white">
-                {mockInternships.length} matches found
+                {isLoading ? 'Loading...' : `${internships.length} matches found`}
               </Badge>
             </div>
             
-            <div className="grid gap-6">
-              {mockInternships.map((internship) => (
+            {isLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading internships...</p>
+              </div>
+            ) : (
+              <div className="grid gap-6">
+                {internships.map((internship) => (
                 <Card key={internship.id} className="glass-card p-6 hover:shadow-lg transition-all duration-300">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-xl font-semibold mb-2">{internship.title}</h3>
-                      <p className="text-muted-foreground font-medium">{internship.company}</p>
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="text-xl font-semibold mb-2">{internship.title}</h3>
+                        <p className="text-muted-foreground font-medium">{internship.company}</p>
+                      </div>
+                      <Badge className="gradient-primary text-white">
+                        {internship.stipend || 'Not specified'}
+                      </Badge>
                     </div>
-                    <Badge className="gradient-primary text-white">
-                      {internship.stipend}
-                    </Badge>
-                  </div>
-                  
-                  <p className="text-muted-foreground mb-4">{internship.description}</p>
-                  
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div className="flex items-center gap-2 text-sm">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span>{internship.location}</span>
+                    
+                    <p className="text-muted-foreground mb-4">{internship.description}</p>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                      <div className="flex items-center gap-2 text-sm">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <span>{internship.location}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Briefcase className="h-4 w-4 text-muted-foreground" />
+                        <span>{internship.type}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Star className="h-4 w-4 text-yellow-500" />
+                        <span>High Match</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span>{internship.duration}</span>
+                    
+                    <div className="mb-4">
+                      <p className="text-sm text-muted-foreground mb-2">Required Skills:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {internship.required_skills.map((skill) => (
+                          <Badge 
+                            key={skill} 
+                            variant={profile.skills.includes(skill) ? 'default' : 'outline'}
+                            className={profile.skills.includes(skill) ? 'gradient-primary text-white' : ''}
+                          >
+                            {skill}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Briefcase className="h-4 w-4 text-muted-foreground" />
-                      <span>{internship.type}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Star className="h-4 w-4 text-yellow-500" />
-                      <span>High Match</span>
-                    </div>
-                  </div>
-                  
-                  <div className="mb-4">
-                    <p className="text-sm text-muted-foreground mb-2">Required Skills:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {internship.skills.map((skill) => (
-                        <Badge 
-                          key={skill} 
-                          variant={profile.skills.includes(skill) ? 'default' : 'outline'}
-                          className={profile.skills.includes(skill) ? 'gradient-primary text-white' : ''}
-                        >
-                          {skill}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
                   
                   <Button className="w-full gradient-primary text-white">
                     Apply Now
                     <ExternalLink className="ml-2 h-4 w-4" />
                   </Button>
                 </Card>
-              ))}
-            </div>
+                  ))
+                }
+              </div>
+            )}
           </div>
         )}
 
@@ -285,8 +365,14 @@ export function Dashboard({ profile }: DashboardProps) {
           <div className="space-y-6">
             <h2 className="text-2xl font-bold">Skill Gap Analysis</h2>
             
-            <div className="grid gap-6">
-              {mockSkillGaps.map((gap, index) => (
+            {isLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Analyzing skills...</p>
+              </div>
+            ) : (
+              <div className="grid gap-6">
+                {skillGaps.map((gap, index) => (
                 <Card key={index} className="glass-card p-6">
                   <div className="flex justify-between items-start mb-4">
                     <div>
@@ -342,8 +428,10 @@ export function Dashboard({ profile }: DashboardProps) {
                     <TrendingUp className="ml-2 h-4 w-4" />
                   </Button>
                 </Card>
-              ))}
-            </div>
+                  ))
+                }
+              </div>
+            )}
           </div>
         )}
 
@@ -356,55 +444,61 @@ export function Dashboard({ profile }: DashboardProps) {
               </Badge>
             </div>
             
-            <div className="grid gap-6">
-              {mockProjects.map((project) => (
-                <Card key={project.id} className="glass-card p-6 hover:shadow-lg transition-all duration-300">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-xl font-semibold mb-2">{project.title}</h3>
-                      <p className="text-muted-foreground">{project.description}</p>
+            {isLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Generating projects...</p>
+              </div>
+            ) : (
+              <div className="grid gap-6">
+                {projects.map((project, index) => (
+                <Card key={index} className="glass-card p-6 hover:shadow-lg transition-all duration-300">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="text-xl font-semibold mb-2">{project.title}</h3>
+                        <p className="text-muted-foreground">{project.description}</p>
+                      </div>
+                      <Badge 
+                        variant="outline"
+                        className={
+                          project.difficulty === 'Beginner' ? 'border-green-500 text-green-500' :
+                          project.difficulty === 'Intermediate' ? 'border-yellow-500 text-yellow-500' :
+                          'border-red-500 text-red-500'
+                        }
+                      >
+                        {project.difficulty}
+                      </Badge>
                     </div>
-                    <Badge 
-                      variant="outline"
-                      className={
-                        project.difficulty === 'Beginner' ? 'border-green-500 text-green-500' :
-                        project.difficulty === 'Intermediate' ? 'border-yellow-500 text-yellow-500' :
-                        'border-red-500 text-red-500'
-                      }
-                    >
-                      {project.difficulty}
-                    </Badge>
-                  </div>
-                  
-                  <div className="mb-4 p-4 bg-secondary/50 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Lightbulb className="h-4 w-4 text-yellow-500" />
-                      <span className="font-medium text-sm">Problem Statement</span>
+                    
+                    <div className="mb-4 p-4 bg-secondary/50 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Lightbulb className="h-4 w-4 text-yellow-500" />
+                        <span className="font-medium text-sm">Problem Statement</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{project.problemStatement}</p>
                     </div>
-                    <p className="text-sm text-muted-foreground">{project.problem}</p>
-                  </div>
-                  
-                  <div className="mb-4">
-                    <p className="text-sm font-medium mb-2">Tech Stack:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {project.techStack.map((tech) => (
-                        <Badge 
-                          key={tech} 
-                          variant={profile.skills.includes(tech) ? 'default' : 'outline'}
-                          className={profile.skills.includes(tech) ? 'gradient-primary text-white' : ''}
-                        >
-                          {tech}
-                        </Badge>
-                      ))}
+                    
+                    <div className="mb-4">
+                      <p className="text-sm font-medium mb-2">Tech Stack:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {project.techStack.map((tech) => (
+                          <Badge 
+                            key={tech} 
+                            variant={profile.skills.includes(tech) ? 'default' : 'outline'}
+                            className={profile.skills.includes(tech) ? 'gradient-primary text-white' : ''}
+                          >
+                            {tech}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
-                      <span>Estimated: {project.estimatedTime}</span>
+                    
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="h-4 w-4" />
+                        <span>Estimated: {project.estimatedTime}</span>
+                      </div>
                     </div>
-                  </div>
                   
                   <div className="grid grid-cols-2 gap-3">
                     <Button variant="outline" className="flex items-center gap-2">
@@ -417,11 +511,16 @@ export function Dashboard({ profile }: DashboardProps) {
                     </Button>
                   </div>
                 </Card>
-              ))}
-            </div>
+                  ))
+                }
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* AI Chat Widget */}
+      <ChatWidget profile={profile} />
     </div>
   );
 }
